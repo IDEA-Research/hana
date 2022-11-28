@@ -1,0 +1,109 @@
+MODEL:
+  image_size: 256
+  num_channels: 128
+  num_res_blocks: 3
+  channel_mult: "1,1,2,4"
+  num_heads: 8 # not working
+  num_head_channels: 128 # not working
+  num_heads_upsample: -1 # not working
+  attention_resolutions: ""
+  dropout: 0.  # DO NOT USE GRADIENT CHECKPOINTING IF SET
+  # text encoder
+  use_pretrained_text_encoder: False
+  text_ctx: 256 # not working
+  xf_width: 0
+  xf_layers: 16 # not working
+  xf_heads: 8   # not working
+  xf_final_ln: True # not working
+  xf_padding: True  # not working
+  # Unet (Cont.)
+  use_scale_shift_norm: True
+  resblock_updown: False
+  use_fp16: True
+  cache_text_emb: False
+  inpaint: False
+  super_res: True
+  noise_cond_augment: True # boolean
+
+DIFFUSION:
+  # diffusion
+  learn_sigma: False
+  sigma_small: False
+  diffusion_steps: 1000
+  noise_schedule: "cosine"
+  timestep_respacing: ""
+  eval_timestep_respacing: "250"
+  use_kl: False
+  predict_xstart: False
+  rescale_timesteps: False
+  rescale_learned_sigmas: False
+  schedule_sampler: null
+
+TRAIN:
+  seed: 0
+  # ema
+  ema: True
+  ema_decay: 0.9999
+  cpu: False
+  update_ema_after_steps: 1000
+  update_every_steps: 1
+  # common
+  train_micro_batch_size_per_gpu: 1
+  lr: 1e-4
+  betas: [0.9, 0.999]
+  eps: 1e-8
+  weight_decay: 0.
+  p2_loss: True
+  # trainer
+  trainer:
+    max_epochs: 50
+    # multi-gpu
+    gpus: 1
+    num_nodes: 1
+    # gradient
+    gradient_clip_val: 1.
+    accumulate_grad_batches: 1
+    # log
+    log_every_n_steps: 1
+    # ckpt
+    ckpt_path: null
+
+  # log
+  wandb:
+    project: "idea_art_test"
+    name: "upsample256_imagen"
+  # checkpoint
+  checkpoint:
+    every_n_train_steps: 10000
+    dirpath: "/comp_robot/mm_generative/ckpt/upsample256/imagen/"
+    filename: "model-{step:02d}"
+    save_last: True
+    save_weights_only: True
+  # demo / val
+  demo:
+    every: 1000
+    dynamic_thresholding_percentile: null
+    lowres_sample_noise_level: 0. # TESTING
+    online: False  # whether to eval online model.
+
+DATA:
+  dataname: "LAION_ART"
+  copy2local: False
+  sr_img_only: True
+  batch_size: 1 # TRAIN.train_micro_batch_size_per_gpu
+  eval_test: True  # eval on test is more expensive - image size is larger
+  val_batch_size: 4
+  # getitem
+  num_workers: 8
+  image_size: 256
+  test_image_size: 256
+  downscale_factor: 4
+  min_crop_factor: 0.5
+  max_crop_factor: 1.
+  random_crop: True
+  gaussian_blur: null # if true, apply Guassian blur kernel(size 3, sigma 0.6)
+  flip: 0.5 # if null, cancel flipping
+  degradation: "cv_area" # "bsrgan_light"
+  text_ctx: 256
+  use_tokenizer: False # set True if not use pre-trained text encoder
+  use_pretrained_text_encoder: True # same as MODEL.use_pretrained_text_encoder

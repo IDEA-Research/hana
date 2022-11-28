@@ -1,0 +1,9 @@
+Prompts	Path
+A cartoon girl called anya.	/comp_robot/mm_generative/eval/prompts/training_eval/sr_images/1_anya.jpeg
+A cute girl.	/comp_robot/mm_generative/eval/prompts/training_eval/sr_images/6_girl.jpeg
+Castle.	/comp_robot/mm_generative/eval/prompts/training_eval/sr_images/2_castle.jpeg
+Burger and fries.	/comp_robot/mm_generative/eval/prompts/training_eval/sr_images/3_burger.jpeg
+Rainbow cake.	/comp_robot/mm_generative/eval/prompts/training_eval/sr_images/4_cake.jpeg
+Two puppies.	/comp_robot/mm_generative/eval/prompts/training_eval/sr_images/5_puppy.jpeg
+Peachcat cartoon characters.	/comp_robot/mm_generative/eval/prompts/training_eval/sr_images/7_peachcat.jpeg
+Coffee.	/comp_robot/mm_generative/eval/prompts/training_eval/sr_images/8_coffee.jpeg
