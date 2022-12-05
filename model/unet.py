@@ -11,6 +11,15 @@ from .nn import avg_pool_nd, conv_nd, linear, normalization, timestep_embedding,
 from deepspeed import checkpointing
 dsp_checkpoint = checkpointing.checkpoint
 
+def convert_module_to_f32(l):
+    """
+    Convert primitive modules to float32, undoing convert_module_to_f16().
+    """
+    if isinstance(l, (nn.Conv1d, nn.Conv2d, nn.Conv3d)):
+        l.weight.data = l.weight.data.float()
+        if l.bias is not None:
+            l.bias.data = l.bias.data.float()
+
 class TimestepBlock(nn.Module):
     """
     Any module where forward() takes timestep embeddings as a second argument.

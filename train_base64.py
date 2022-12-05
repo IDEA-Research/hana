@@ -24,11 +24,11 @@ from config.deepspeed import deepspeed_config
 from callbacks import EMAWeightUpdate, DemoCallback
 from datamodule import get_datamodule
 
-from decoder.resample import LossAwareSampler, UniformSampler
-from decoder.model_creation import create_model_and_diffusion as create_model_and_diffusion_dalle2
-from decoder.model_creation import create_gaussian_diffusion
-from decoder.text2im_model import Text2ImUNet
-from decoder.respace import SpacedDiffusion
+from model.resample import LossAwareSampler, UniformSampler
+from model.model_creation import create_model_and_diffusion as create_model_and_diffusion_dalle2
+from model.model_creation import create_gaussian_diffusion
+from model.text2im_model import Text2ImUNet
+from model.respace import SpacedDiffusion
 from utils.tokenizer import get_encoder
 
 # experiment setting
