@@ -43,7 +43,7 @@ of the package. Here we list main procedures:
   python generate_mapping_file.py --raw_dir cc3m/raw_data --outfile cc3m/cc3m_map.json 
   ```
   Mapping file format example:
-  ```json
+  ```
   {
     '00000_000000000':{
       'img_path': "raw_data/00000/000000000.jpg",
