@@ -35,7 +35,7 @@ class BaseDataset(Dataset):
         self.keys = list(self.mapping.keys())
         self.data_dir = os.path.dirname(mapping_file)
         
-        assert return_clip_embedding or return_t5_embedding, 'At least one of return_clip_embedding and return_t5_embedding should be True'
+        assert return_clip_embedding or return_t5_embedding, 'At least one kind of embedding should be returned but got return_clip_embedding=False and return_t5_embedding=False'
         self.return_clip_embedding = return_clip_embedding
         self.return_t5_embedding = return_t5_embedding
     

@@ -26,7 +26,7 @@ from torch.utils.data import Dataset
 import clip
 
 
-class ToyDataset(Dataset):
+class BatchDataset(Dataset):
     def __init__(self, json_file, transforms=None, **kwargs) -> None:
         super().__init__()
         with open(json_file, 'r') as f:
@@ -50,15 +50,15 @@ class ToyDataset(Dataset):
         return img, caption, total_index
 
 
-def run_embedding(json_file, outdir, batch_size=512):
+def generate_clip_embedding(json_file, outdir, CLIP_version='ViT-L/14', batch_size=512):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model, preprocess = clip.load('ViT-L/14', device=device)
+    model, preprocess = clip.load(CLIP_version, device=device)
     
     assert os.path.exists(json_file), 'Mapping file does not exist: {}'.format(json_file)
     if not os.path.exists(outdir):
         os.makedirs(outdir)
     
-    dataset = ToyDataset(json_file, transforms=preprocess)
+    dataset = BatchDataset(json_file, transforms=preprocess)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=12)
     
     with torch.no_grad():
@@ -83,5 +83,6 @@ if __name__ == '__main__':
     parser.add_argument('--json_file', type=str, required=True)
     parser.add_argument('--outdir', type=str, required=True)
     parser.add_argument('--batch_size', type=int, default=512, help='Batch size')
+    parser.add_argument('--CLIP_version', type=str, default='ViT-L/14', help='CLIP model version')
     args = parser.parse_args()
-    run_embedding(args.json_file, args.outdir, args.batch_size)
+    generate_clip_embedding(args.json_file, args.outdir, args.CLIP_version, args.batch_size)

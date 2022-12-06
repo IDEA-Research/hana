@@ -65,8 +65,8 @@ class SRImageProcessor(object):
             random_crop: bool, enable random crop if True, else center crop
             degradation: str, ["bsrgan", "bsrgan_light", interpolation_mode etc]
             gaussian_blur: bool, enable gaussian blur if True
-            HR_transforms: transforms to apply to HR image
-            LR_transforms: transforms to apply to LR image
+            HR_transforms: transforms to apply to High Resolution image
+            LR_transforms: transforms to apply to Low Resolution image
             blur_prob: probability of applying gaussian blur
             random_flip_prob: probability of applying random horizontal flip
         """

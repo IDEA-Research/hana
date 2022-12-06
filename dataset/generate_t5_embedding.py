@@ -25,7 +25,7 @@ from torch.utils.data import Dataset
 from transformers import T5Tokenizer, T5EncoderModel
 
 
-class ToyDataset(Dataset):
+class BatchDataset(Dataset):
     def __init__(self, json_file, **kwargs) -> None:
         super().__init__()
         with open(json_file, 'r') as f:
@@ -52,17 +52,17 @@ class ToyDataset(Dataset):
         return input_ids, attention_mask, total_index
 
 
-def run_embedding(json_file, outdir, batch_size=32):
+def generate_t5_embedding(json_file, outdir, T5_version='t5-11b', batch_size=32):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     assert os.path.exists(json_file), 'Mapping file does not exist: {}'.format(json_file)
     if not os.path.exists(outdir):
         os.makedirs(outdir)
     
-    dataset = ToyDataset(json_file, transforms=None)
+    dataset = BatchDataset(json_file, transforms=None)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=12)
     
-    t5_model = T5EncoderModel.from_pretrained("t5-11b").to(device)
+    t5_model = T5EncoderModel.from_pretrained(T5_version).to(device)
     
     with torch.no_grad():
         for input_ids, attention_mask, index in tqdm(dataloader):
@@ -85,5 +85,6 @@ if __name__ == '__main__':
     parser.add_argument('--json_file', type=str, required=True)
     parser.add_argument('--outdir', type=str, required=True)
     parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--T5_version', type=str, default='t5-11b', help='pretained T5 version')
     args = parser.parse_args()
-    run_embedding(args.json_file, args.outdir, args.batch_size)
+    generate_t5_embedding(args.json_file, args.outdir, args.T5_version, args.batch_size)
