@@ -18,7 +18,7 @@ import copy
 import os
 import copy
 from omegaconf import OmegaConf
-from typing import List, Tuple, Dict, Union, Optional, Any
+from typing import Dict, Any
 from resize_right import resize
 
 import torch as th
@@ -104,9 +104,13 @@ class BaseDecoder(pl.LightningModule):
 
         self.save_hyperparameters()
 
+    def build_model(self, cfg):
+        """build model"""
+        pass
 
-    def forward(self, x):
-        raise NotImplementedError()
+    def build_diffusion(self, cfg):
+        """return train diffusion / eval diffusion according to cfg"""
+        pass
 
     def configure_optimizers(self):
         optimizer = th.optim.AdamW(
@@ -121,7 +125,7 @@ class BaseDecoder(pl.LightningModule):
     def training_step(self, batch):
         """
         Args:
-            batch: 
+            batch: (dict): 
                 img_embedding: Tensor (B, D)
                 text_embedding: Tensor (B, D)
                 img: Tensor (B, C, H, W)
@@ -130,6 +134,7 @@ class BaseDecoder(pl.LightningModule):
                 mask: Tensor (B, T)
         """
         cond = {}
+        # TODO: according to input dict
         if len(batch) == 5:
             img_embed, _, img, _, text_encodings = batch
             cond["clip_emb"] = img_embed
@@ -158,6 +163,8 @@ class BaseDecoder(pl.LightningModule):
 
         loss = (losses["loss"] * weights).mean()
         
+        # TODO: self.log -> for loop
+        
         # log loss terms
         # self.log("train/loss", loss, on_step=True, rank_zero_only=True)
         if "mse" in losses:
@@ -168,6 +175,7 @@ class BaseDecoder(pl.LightningModule):
         self.log("train/loss", loss, on_step=True, rank_zero_only=True)
         return loss
 
+    # TODO: delete validation steps
     def validation_step(self, *args, **kwargs):
         pass
 
@@ -201,11 +209,14 @@ if __name__ == "__main__":
     config = OmegaConf.load(args.config_path)
 
     # change deepspeed config according to args & config
+    # TODO: cfg.train.lr / cfg.train.min_lr / cfg.train.warmup_num_steps
     deepspeed_config["train_micro_batch_size_per_gpu"] = args.train_micro_batch_size_per_gpu
     if "scheduler" in deepspeed_config:
         deepspeed_config["scheduler"]["params"]["warmup_max_lr"] = config.TRAIN.lr
         deepspeed_config["scheduler"]["params"]["warmup_min_lr"] = config.TRAIN.min_lr
         deepspeed_config["scheduler"]["params"]["warmup_num_steps"] = config.TRAIN.warmup_num_steps
+    
+    # TODO: cfg.model.use_fp16
     if args.fp16:
         config.MODEL.use_fp16 = True
     else:
@@ -234,6 +245,8 @@ if __name__ == "__main__":
     checkpoint_callback = ModelCheckpoint(
         **config.TRAIN.checkpoint,
     )
+
+    # TODO: Demo to WandbVisualizeCallBack
     # set up demo callback
     demo_callback = DemoCallback(
         demo_every=config.TRAIN.demo.every,
@@ -256,15 +269,22 @@ if __name__ == "__main__":
     callbacks.extend([demo_callback, checkpoint_callback, ModelSummary(max_depth=1)])
 
     # set up wandb logger
+    # TODO: move to config
     logger_dir = "./log/base64"
     if not os.path.exists(logger_dir):
         os.makedirs(logger_dir, exist_ok=True)
+    # TODO: if config.wandb.enabled, add a switch
     wandb_logger = WandbLogger(
         **{**config.TRAIN.wandb, 'save_dir': logger_dir, },
     )
     
     # init trainer
     pl.seed_everything(config.TRAIN.seed)
+    # cfg.train.max_epochs
+    # cfg.train.max_steps
+    # cfg.train.log_every_n_steps
+    # cfg.acccumulate_grad_batches
+    # TODO delete trainer_cfg
     trainer_cfg = config.TRAIN.trainer
     trainer = pl.Trainer(
         precision=16 if args.fp16 else 32,
