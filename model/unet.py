@@ -5,11 +5,12 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .fp16_util import convert_module_to_f16, convert_module_to_f32
-from .nn import avg_pool_nd, conv_nd, linear, normalization, timestep_embedding, zero_module
+from .nn import avg_pool_nd, conv_nd, linear, normalization, timestep_embedding, zero_module,\
+    convert_module_to_f16, convert_module_to_f32
 
 from deepspeed import checkpointing
 dsp_checkpoint = checkpointing.checkpoint
+
 
 class TimestepBlock(nn.Module):
     """

@@ -3,9 +3,8 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .nn import linear, timestep_embedding
+from .nn import timestep_embedding, LayerNorm
 from .unet import UNetModel
-from .xf import LayerNorm, Transformer, convert_module_to_f16
 
 from deepspeed import checkpointing
 dsp_checkpoint = checkpointing.checkpoint
@@ -19,10 +18,6 @@ class Text2ImUNet(UNetModel):
     Expects an extra kwarg `tokens` of text.
 
     :param text_ctx: number of text tokens to expect.
-    :param xf_width: width of the transformer.
-    :param xf_layers: depth of the transformer.
-    :param xf_heads: heads in the transformer.
-    :param xf_final_ln: use a LayerNorm after the output layer.
     :param tokenizer: the text tokenizer for sampling/vocab size.
     """
 
@@ -30,141 +25,44 @@ class Text2ImUNet(UNetModel):
         self,
         text_ctx,
         xf_width,
-        xf_layers,
-        xf_heads,
         xf_final_ln,
         tokenizer,
         *args,
-        cache_text_emb=False,
-        xf_ar=0.0,
-        xf_padding=False,
-        share_unemb=False,
         use_pretrained_text_encoder=False,
         **kwargs,
     ):
         self.text_ctx = text_ctx
         self.xf_width = xf_width
-        self.xf_ar = xf_ar
-        self.xf_padding = xf_padding
         self.tokenizer = tokenizer
         if "noise_cond_augment" in kwargs:
             del kwargs['noise_cond_augment']
 
         if not xf_width:
             super().__init__(*args, **kwargs, encoder_channels=None)
-        else:  # w/o training text-encoder
+        else: 
             super().__init__(*args, **kwargs, encoder_channels=xf_width)
 
         self.use_pretrained_text_encoder = use_pretrained_text_encoder
+        self.clip_embed_proj = nn.Linear(self.clip_embed_dim, self.model_channels * 4)
+        self.final_ln = LayerNorm(xf_width) if xf_final_ln else nn.Identity()
 
-        self.clip_embed_proj = nn.Linear(
-            self.clip_embed_dim, self.model_channels * 4)
-
-        if xf_final_ln:
-            self.final_ln = LayerNorm(xf_width)
-        else:
-            self.final_ln = None
-
-        # if need train text-encoder
-        if not self.use_pretrained_text_encoder and self.xf_width > 0:
-            self.transformer = Transformer(
-                text_ctx,
-                xf_width,
-                xf_layers,
-                xf_heads,
-            )
-            self.token_embedding = nn.Embedding(
-                self.tokenizer.n_vocab, xf_width)
-            self.positional_embedding = nn.Parameter(
-                th.empty(text_ctx, xf_width, dtype=th.float32))
-            self.transformer_proj = nn.Linear(
-                xf_width, self.model_channels * 4)
-
-            if self.xf_padding:
-                self.padding_embedding = nn.Parameter(
-                    th.empty(text_ctx, xf_width, dtype=th.float32)
-                )
-            if self.xf_ar:
-                self.unemb = nn.Linear(xf_width, self.tokenizer.n_vocab)
-                if share_unemb:
-                    self.unemb.weight = self.token_embedding.weight
-        # if use pre-trained text encoder
-        elif self.use_pretrained_text_encoder:
-            assert self.xf_width > 0, "xf_width must be > 0 if using pretrained text encoder"
-            self.transformer_proj = nn.Linear(
-                xf_width, self.model_channels * 4)
-
-        self.cache_text_emb = cache_text_emb
-        self.cache = None
-        #
-        self.time_to_half = nn.Linear(
-            self.model_channels * 4, self.model_channels * 2)
-        self.clip_to_half = nn.Linear(
-            self.model_channels * 4, self.model_channels * 2)
-        #
+        self.transformer_proj = nn.Linear(xf_width, self.model_channels * 4)
+        self.time_to_half = nn.Linear(self.model_channels * 4, self.model_channels * 2)
+        self.clip_to_half = nn.Linear(self.model_channels * 4, self.model_channels * 2)
 
     def convert_to_fp16(self):
         super().convert_to_fp16()
         if not self.use_pretrained_text_encoder and self.xf_width > 0:
-            self.transformer.apply(convert_module_to_f16)
             self.transformer_proj.to(th.float16)
-            self.token_embedding.to(th.float16)
-            self.positional_embedding.to(th.float16)
-            if self.xf_padding:
-                self.padding_embedding.to(th.float16)
-            if self.xf_ar:
-                self.unemb.to(th.float16)
 
-    def get_text_emb(self, tokens, mask):
-        assert tokens is not None
-
-        if self.cache_text_emb and self.cache is not None:
-            assert (
-                tokens == self.cache["tokens"]
-            ).all(), f"Tokens {tokens.cpu().numpy().tolist()} do not match cache {self.cache['tokens'].cpu().numpy().tolist()}"
-            return self.cache
-
-        xf_in = self.token_embedding(tokens.long())
-        xf_in = xf_in + self.positional_embedding[None]
-        if self.xf_padding:
-            assert mask is not None
-            xf_in = th.where(mask[..., None], xf_in, self.padding_embedding[None])
-        xf_out = self.transformer(xf_in.to(self.dtype))
-        if self.final_ln is not None:
-            xf_out = self.final_ln(xf_out)
-        xf_proj = self.transformer_proj(xf_out[:, -1])
-        xf_out = xf_out.permute(0, 2, 1)  # NLC -> NCL
-
-        outputs = dict(xf_proj=xf_proj, xf_out=xf_out)
-
-        if self.cache_text_emb:
-            self.cache = dict(
-                tokens=tokens,
-                xf_proj=xf_proj.detach(),
-                xf_out=xf_out.detach() if xf_out is not None else None,
-            )
-
-        return outputs
-
-    def del_cache(self):
-        self.cache = None
-
-    def forward(self, x, timesteps, clip_emb=None, tokens=None, mask=None, text_encodings=None, use_clip_emb=True,
-                mode='train'):
+    def forward(self, x, timesteps, clip_emb=None, text_encodings=None, use_clip_emb=True, mode='train'):
         hs = []
-        emb = self.time_embed(timestep_embedding(
-            timesteps, self.model_channels).type(self.dtype))
+        emb = self.time_embed(timestep_embedding(timesteps, self.model_channels).type(self.dtype))
         if self.xf_width > 0:
-            if not self.use_pretrained_text_encoder:
-                text_outputs = self.get_text_emb(tokens, mask)
-                xf_proj, xf_out = text_outputs["xf_proj"], text_outputs["xf_out"]
-            else:
-                if self.final_ln is not None:
-                    text_encodings = self.final_ln(text_encodings)
-                text_embeds = F.avg_pool1d(text_encodings.transpose(
-                    1, 2), kernel_size=text_encodings.size(1)).squeeze(-1)
-                xf_proj = self.transformer_proj(text_embeds)
-                xf_out = text_encodings.permute(0, 2, 1)
+            text_encodings = self.final_ln(text_encodings)
+            text_embeds = F.avg_pool1d(text_encodings.transpose(1, 2), kernel_size=text_encodings.size(1)).squeeze(-1)
+            xf_proj = self.transformer_proj(text_embeds) # (B, 4 * C)
+            xf_out = text_encodings.permute(0, 2, 1)
 
             if not use_clip_emb:
                 # mask 10% encodings
@@ -173,9 +71,7 @@ class Text2ImUNet(UNetModel):
                 xf_out = xf_out_mask[..., None, None] * xf_out
                 xf_proj = xf_out_mask[..., None] * xf_proj
                 # combine time_emb & text_emb
-                emb = th.cat([self.time_to_half(emb),
-                              self.clip_to_half(xf_proj)], dim=1).to(emb)
-                # emb = emb + xf_proj.to(emb)
+                emb = th.cat([self.time_to_half(emb), self.clip_to_half(xf_proj)], dim=1).to(emb)
             else: # Dalle config
                 # mask 50% encodings
                 xf_out_mask = th.zeros(xf_out.shape[0], device=xf_out.device).type(
@@ -203,14 +99,11 @@ class Text2ImUNet(UNetModel):
         h = x.type(self.dtype)
         for module in self.input_blocks:
             h = dsp_checkpoint(module, h, emb, xf_out)
-            # h = module(h, emb, xf_out)
             hs.append(h)
-        # h = dsp_checkpoint(self.middle_block, h, emb, xf_out)
         h = self.middle_block(h, emb, xf_out)
         for module in self.output_blocks:
             h = th.cat([h, hs.pop()], dim=1)
             h = dsp_checkpoint(module, h, emb, xf_out)
-            # h = module(h, emb, xf_out)
         h = self.out(h)
         return h
 
@@ -237,8 +130,7 @@ class SuperResText2ImUNet(Text2ImUNet):
         self.time_token_proj = nn.Identity()
         if noise_cond_augment:
             self.lowres_cond_time_embed = copy.deepcopy(self.time_embed)
-            self.time_token_proj = nn.Linear(
-                self.model_channels * 8, self.model_channels * 4)
+            self.time_token_proj = nn.Linear(self.model_channels * 8, self.model_channels * 4)
 
     def forward(self, x, timesteps, aug_t=None, low_res=None):
         _, _, new_height, new_width = x.shape
@@ -248,12 +140,10 @@ class SuperResText2ImUNet(Text2ImUNet):
         x = th.cat([x, upsampled], dim=1)
 
         hs = []
-        t_emb = self.time_embed(timestep_embedding(
-            timesteps, self.model_channels).type(self.dtype))
+        t_emb = self.time_embed(timestep_embedding(timesteps, self.model_channels).type(self.dtype))
 
         if aug_t is not None:
-            aug_t_emb = self.lowres_cond_time_embed(
-                timestep_embedding(aug_t, self.model_channels).type(self.dtype))
+            aug_t_emb = self.lowres_cond_time_embed(timestep_embedding(aug_t, self.model_channels).type(self.dtype))
             t_emb = th.cat([t_emb, aug_t_emb], dim=-1)
         emb = self.time_token_proj(t_emb)
 
@@ -261,14 +151,11 @@ class SuperResText2ImUNet(Text2ImUNet):
 
         for module in self.input_blocks:
             h = module(h, emb)
-            # h = dsp_checkpoint(module, h, emb)
             hs.append(h)
         h = self.middle_block(h, emb)
-        # h = dsp_checkpoint(self.middle_block, h, emb)
         for module in self.output_blocks:
             h = th.cat([h, hs.pop()], dim=1)
             h = module(h, emb)
-            # h = dsp_checkpoint(module, h, emb)
         h = self.out(h)
 
         return h

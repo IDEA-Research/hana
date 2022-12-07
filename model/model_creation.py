@@ -1,7 +1,6 @@
-from .gaussian_diffusion import get_named_beta_schedule
 from . import gaussian_diffusion as gd
 from .respace import SpacedDiffusion, space_timesteps
-from decoder.text2im_model import (
+from model.text2im_model import (
     InpaintText2ImUNet,
     SuperResInpaintText2ImUnet,
     SuperResText2ImUNet,
