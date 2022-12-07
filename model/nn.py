@@ -8,16 +8,26 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-def update_ema(target_params, source_params, rate=0.99):
+
+def convert_module_to_f16(l):
     """
-    Update target parameters to be closer to those of source parameters using
-    an exponential moving average.
-    :param target_params: the target parameter sequence.
-    :param source_params: the source parameter sequence.
-    :param rate: the EMA rate (closer to 1 means slower).
+    Convert primitive modules to float16.
     """
-    for targ, src in zip(target_params, source_params):
-        targ.detach().mul_(rate).add_(src, alpha=1 - rate)
+    if isinstance(l, (nn.Conv1d, nn.Conv2d, nn.Conv3d)):
+        l.weight.data = l.weight.data.half()
+        if l.bias is not None:
+            l.bias.data = l.bias.data.half()
+
+
+def convert_module_to_f32(l):
+    """
+    Convert primitive modules to float32, undoing convert_module_to_f16().
+    """
+    if isinstance(l, (nn.Conv1d, nn.Conv2d, nn.Conv3d)):
+        l.weight.data = l.weight.data.float()
+        if l.bias is not None:
+            l.bias.data = l.bias.data.float()
+
 
 class GroupNorm32(nn.GroupNorm):
     def __init__(self, num_groups, num_channels, swish, eps=1e-5):
@@ -93,6 +103,15 @@ def normalization(channels, swish=0.0):
     :return: an nn.Module for normalization.
     """
     return GroupNorm32(num_channels=channels, num_groups=32, swish=swish)
+
+
+class LayerNorm(nn.LayerNorm):
+    """
+    Implementation that supports fp16 inputs but fp32 gains/biases.
+    """
+
+    def forward(self, x: th.Tensor):
+        return super().forward(x)
 
 
 def timestep_embedding(timesteps, dim, max_period=10000):
