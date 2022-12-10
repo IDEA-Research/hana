@@ -1,0 +1,90 @@
+model:
+  image_size: 64
+  num_channels: 192
+  num_res_blocks: 3
+  channel_mult: "1,2,3,4"
+  attention_resolutions: "32,16,8"
+  num_heads: 1
+  num_head_channels: 64
+  num_heads_upsample: -1
+  use_scale_shift_norm: True
+  dropout: 0.1
+  use_pretrained_text_encoder: True
+  use_clip_emb: False
+  text_ctx: 256 
+  xf_width: 1024
+  xf_final_ln: True
+  resblock_updown: True
+  use_fp16: True 
+  inpaint: False
+  super_res: False
+  learn_sigma: True
+  noise_cond_augment: False
+
+diffusion:
+  steps: 1000
+  learn_sigma: True
+  sigma_small: False
+  noise_schedule: "cosine"
+  use_kl: False
+  predict_xstart: False
+  rescale_timesteps: True
+  rescale_learned_sigmas: True
+  schedule_sampler: null
+  timestep_respacing: ""
+  eval_timestep_respacing: "250"
+
+train: 
+  seed: 0
+  ema:
+    enable: True
+    decay: 0.9999
+    cpu: False
+    update_after_steps: 1000
+    update_every_steps: 1
+  max_epochs: 50
+  max_steps: null
+  gpus: 1
+  num_nodes: 1
+  gradient_clip_val: 1.0
+  accumulate_grad_batches: 1
+  resume:
+    ckpt_path: Null
+
+validate:
+  every: 250
+  dynamic_thresholding_percentile: Null
+  guidance_scale: 3.0
+  online: False  # whether to eval online model.
+
+optimizer:
+  lr: 1.2e-4
+  min_lr: 1.0e-5
+  betas: [0.9, 0.999]
+  eps: 1e-8
+  weight_decay: 1e-9
+  warmup_num_steps: 1000
+
+logger:
+  enable: True
+  project: "tiny64"
+  name: "t5"
+  dir: "./log/base64"
+  log_every_n_steps: 1
+
+checkpoint:
+  every_n_train_steps: 10000
+  dirpath: "/comp_robot/mm_generative/ckpt/base64/tiny64_t5"
+  filename: "model-{step:02d}"
+  save_last: True
+  save_top_k: -1
+  save_weights_only: False
+
+data:
+  mapping_file: "" # required
+  image_size: 64
+  batch_size: 1
+  val_batch_size: 1
+  num_workers: 4
+  p_flip: 0.5
+  interpolation: "bilinear"

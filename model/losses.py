@@ -14,7 +14,7 @@
 # limitations under the License.
 # ------------------------------------------------------------------------------------------------
 # Modified from:
-# 
+# https://github.com/openai/guided-diffusion/blob/main/guided_diffusion/losses.py
 # ------------------------------------------------------------------------------------------------
 
 import numpy as np
