@@ -68,13 +68,15 @@ def generate_t5_embedding(json_file, outdir, T5_version='t5-11b', batch_size=32)
         for input_ids, attention_mask, index in tqdm(dataloader):
             input_ids = input_ids.to(device)
             attention_mask = attention_mask.to(device)
+            num_valid_tokens = attention_mask.sum(1) # [batch_size]
             with torch.no_grad():
                 outputs = t5_model(input_ids=input_ids, attention_mask=attention_mask)
                 last_hidden_states = outputs.last_hidden_state 
             attention_mask = attention_mask.bool()
             last_hidden_states = last_hidden_states.masked_fill(~attention_mask.unsqueeze(-1), 0)
             for i, idx in enumerate(index):
-                t5_emb = last_hidden_states[i].cpu().numpy()
+                num_valid_token = num_valid_tokens[i].item()
+                t5_emb = last_hidden_states[i, :num_valid_token].cpu().numpy()
                 t5_emb_path = os.path.join(outdir, '{}.t5_emb'.format(idx))
                 with open(t5_emb_path, 'wb') as t5_bf:
                     t5_bf.write(t5_emb.tobytes())

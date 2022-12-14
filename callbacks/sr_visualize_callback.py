@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from contextlib import contextmanager
 import wandb
 import time
 
@@ -21,27 +20,10 @@ import torch as th
 import torch.nn.functional as F
 from torchvision.utils import make_grid
 from torchvision.transforms.functional import to_pil_image
-
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_only
 
-
-@contextmanager
-def train_mode(model, mode=True):
-    """A context manager that places a model into training mode and restores
-    the previous mode on exit."""
-    modes = [module.training for module in model.modules()]
-    try:
-        yield model.train(mode)
-    finally:
-        for i, module in enumerate(model.modules()):
-            module.training = modes[i]
-
-
-def eval_mode(model):
-    """A context manager that places a model into evaluation mode and restores
-    the previous mode on exit."""
-    return train_mode(model, False)
+from callbacks.utils import eval_mode
 
 
 class VisualizeSRCallBack(pl.Callback):

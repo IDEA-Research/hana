@@ -68,7 +68,8 @@ class Text2ImUNet(UNetModel):
         self.clip_embed_proj = nn.Linear(self.clip_embed_dim, self.model_channels * 4)
         self.final_ln = LayerNorm(xf_width) if xf_final_ln else nn.Identity()
 
-        self.transformer_proj = nn.Linear(xf_width, self.model_channels * 4)
+        if xf_width > 0:
+            self.transformer_proj = nn.Linear(xf_width, self.model_channels * 4)
         self.time_to_half = nn.Linear(self.model_channels * 4, self.model_channels * 2)
         self.clip_to_half = nn.Linear(self.model_channels * 4, self.model_channels * 2)
 
@@ -121,12 +122,18 @@ class Text2ImUNet(UNetModel):
             
         h = x.type(self.dtype)
         for module in self.input_blocks:
-            h = dsp_checkpoint(module, h, emb, xf_out)
+            if mode == 'train':
+                h = dsp_checkpoint(module, h, emb, xf_out)
+            else:
+                h = module(h, emb, xf_out)
             hs.append(h)
         h = self.middle_block(h, emb, xf_out)
         for module in self.output_blocks:
             h = th.cat([h, hs.pop()], dim=1)
-            h = dsp_checkpoint(module, h, emb, xf_out)
+            if mode == 'train':
+                h = dsp_checkpoint(module, h, emb, xf_out)
+            else:
+                h = module(h, emb, xf_out)
         h = self.out(h)
         return h
 

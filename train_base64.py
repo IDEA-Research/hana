@@ -107,8 +107,8 @@ class BaseDecoder(pl.LightningModule):
         cond = {}
         img = batch["img"]
         img = img.mul(2).sub(1)
-        cond["clip_emb"] = getattr(batch, "img_clip_embedding", None)
-        cond['text_encodings'] = getattr(batch, "t5_embedding", None)      
+        cond['clip_emb'] = batch.get("img_clip_embedding", None)
+        cond['text_encodings'] = batch.get("t5_embedding", None)
         t, weights = self.schedule_sampler.sample(img.shape[0], img.device)
 
         losses = self.diffusion.training_losses(

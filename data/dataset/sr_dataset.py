@@ -246,6 +246,8 @@ class SRDataset(Dataset):
                 self.data_dir, 't5_embedding', f'{key}.t5_emb'
             )
             t5_embedding = self.read_bytes_embedding(t5_embedding_path, np.float32).reshape(-1, 1024)
-            out['t5_embedding'] = torch.from_numpy(t5_embedding.copy())
-        
+            t5_token_num = t5_embedding.shape[0]
+            t5_embedding = torch.from_numpy(t5_embedding.copy())
+            t5_embedding = torch.cat([t5_embedding, torch.zeros(256-t5_token_num, 1024)], dim=0)
+            out['t5_embedding'] = t5_embedding
         return out

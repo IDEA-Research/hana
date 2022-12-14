@@ -1,6 +1,6 @@
 model:
   image_size: 64
-  num_channels: 192
+  num_channels: 512
   num_res_blocks: 3
   channel_mult: "1,2,3,4"
   attention_resolutions: "32,16,8"
@@ -8,7 +8,7 @@ model:
   num_head_channels: 64
   num_heads_upsample: -1
   use_scale_shift_norm: True
-  dropout: 0.1
+  dropout: 0.
   use_pretrained_text_encoder: True
   use_clip_emb: False
   text_ctx: 256 
@@ -18,12 +18,12 @@ model:
   use_fp16: True 
   inpaint: False
   super_res: False
-  learn_sigma: True
+  learn_sigma: False
   noise_cond_augment: False
 
 diffusion:
   steps: 1000
-  learn_sigma: True
+  learn_sigma: False
   sigma_small: False
   noise_schedule: "cosine"
   use_kl: False
@@ -37,7 +37,7 @@ diffusion:
 train: 
   seed: 0
   ema:
-    enable: True
+    enable: False
     decay: 0.9999
     cpu: False
     update_after_steps: 1000

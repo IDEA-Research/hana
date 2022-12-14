@@ -67,21 +67,21 @@ optimizer:
 
 logger:
   enable: True
-  project: "idea_art"
-  name: "upsample256_dalle_LAION400"
-  dir: "./log/idea_art"
+  project: "PROJECT_NAME"
+  name: "EXP_NAME"
+  dir: "path/to/logger_dir"
   log_every_n_steps: 1
 
 checkpoint:
   every_n_train_steps: 10000
-  dirpath: "/comp_robot/mm_generative/ckpt/idea_art/upsample256/dalle/"
+  dirpath: "path/to/ckpt_dir"
   filename: "model-{step:02d}"
   save_last: True
   save_top_k: -1
   save_weights_only: False
 
 data:
-  mapping_file: "/comp_robot/mm_generative/data/cc3m/cc3m_map.json" 
+  mapping_file: "path/to/mapping_file" 
   image_size: 64
   test_image_size: 256
   batch_size: 1

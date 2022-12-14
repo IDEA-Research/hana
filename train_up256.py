@@ -67,7 +67,7 @@ class Up256Decoder(pl.LightningModule):
         # whether use p2 loss
         self.p2_loss = cfg.train.p2_loss
         # whether use noise conditional augmentation (suggested in Imagen and CDM)
-        self.noise_cond_augment = self.model_cfg.noise_cond_augment
+        self.noise_cond_augment = cfg.model.noise_cond_augment
         
         if cfg.train.ema.enable:
             self.ema_model = copy.deepcopy(self.model)
@@ -162,12 +162,14 @@ class Up256Decoder(pl.LightningModule):
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("--config_path", type=str, default="config/upsample256.yaml")
+    arg_parser.add_argument("--mapping_file", type=str, required=True)
     arg_parser.add_argument("--train_micro_batch_size_per_gpu", type=int, default=1)
     arg_parser.add_argument("--val_batch_size", type=int, default=0)
     arg_parser.add_argument("--gpus", type=int, default=1)
     arg_parser.add_argument("--num_nodes", type=int, default=1)
     arg_parser.add_argument("--fp16", action="store_true")
     arg_parser.add_argument("--offload", action="store_true")
+    arg_parser.add_argument("--wandb_debug", action="store_true")
     args = arg_parser.parse_args()
 
     # set up config
@@ -197,7 +199,7 @@ if __name__ == "__main__":
         return_clip_embedding=cfg.model.use_clip_emb,
         return_t5_embedding=cfg.model.use_pretrained_text_encoder,
         image_size=cfg.data.image_size,
-        val_batch_size=cfg.data.val_batch_size,
+        val_image_size=cfg.data.test_image_size,
         batch_size=cfg.data.batch_size,
         val_batch_size=cfg.data.val_batch_size,
         num_workers=cfg.data.num_workers,
@@ -231,7 +233,6 @@ if __name__ == "__main__":
         demo_every=cfg.validate.every,
         dynamic_thresholding_percentile=cfg.validate.dynamic_thresholding_percentile,
         lowres_sample_noise_level=cfg.validate.lowres_sample_noise_level,
-        eval_on_test=cfg.data.eval_test,
         eval_online=cfg.validate.online,
     )
 
@@ -258,6 +259,7 @@ if __name__ == "__main__":
                 'project': cfg.logger.project,
                 'name': cfg.logger.name,
                 'save_dir': logger_dir, 
+                'mode': 'disabled' if args.wandb_debug else 'online',
             },
         )
     
