@@ -1,21 +1,5 @@
-'''
-Description: 
-version: 
-Author: ciao
-Date: 2022-05-24 17:20:11
-LastEditTime: 2022-05-26 13:26:49
-'''
 deepspeed_config = {
     "zero_allow_untested_optimizer": True,
-    # "optimizer": {
-    #     "type": "Adam",
-    #     "params": {
-    #         "lr": 1.2e-4,
-    #         "betas": [0.9, 0.999],
-    #         "eps": 1e-8,
-    #         "weight_decay": 1e-9,
-    #     },
-    # },
     "scheduler": {
         "type": "WarmupLR",
         "params": {
@@ -46,7 +30,6 @@ deepspeed_config = {
     },
     "steps_per_print": 100,
     "train_micro_batch_size_per_gpu": 8,
-    
     "activation_checkpointing": {
         "partition_activations": False,
         "cpu_checkpointing": False,

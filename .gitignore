@@ -133,3 +133,6 @@ dmypy.json
 
 # jupyter notebook
 **/*.ipynb
+
+# logs
+log/

@@ -1,0 +1,98 @@
+model:
+  image_size: 256
+  num_channels: 320
+  num_res_blocks: 3
+  channel_mult: "1,2,3,4"
+  attention_resolutions: ""
+  num_heads: 4 
+  num_head_channels: 64 
+  num_heads_upsample: -1
+  use_scale_shift_norm: True
+  dropout: 0.  
+  use_pretrained_text_encoder: False
+  use_clip_emb: False
+  text_ctx: 256 
+  xf_width: 0
+  xf_final_ln: True  
+  resblock_updown: False
+  use_fp16: True
+  inpaint: False
+  super_res: True
+  learn_sigma: False
+  noise_cond_augment: False 
+
+diffusion:
+  steps: 1000
+  learn_sigma: False
+  sigma_small: False
+  noise_schedule: "cosine"
+  use_kl: False
+  predict_xstart: False
+  rescale_timesteps: False
+  rescale_learned_sigmas: False
+  schedule_sampler: null
+  timestep_respacing: ""
+  eval_timestep_respacing: "ddim27"
+
+train:
+  seed: 0
+  ema:
+    enable: True
+    decay: 0.9999
+    cpu: False
+    update_after_steps: 1000
+    update_every_steps: 1
+  max_epochs: 15
+  gpus: 1
+  num_nodes: 1
+  gradient_clip_val: 1.
+  accumulate_grad_batches: 1
+  p2_loss: False
+  resume:
+    ckpt_path: Null
+
+validate:
+  every: 1000
+  dynamic_thresholding_percentile: Null
+  lowres_sample_noise_level: Null 
+  online: True
+
+optimizer:
+  lr: 1.2e-4
+  min_lr: 1.0e-5
+  betas: [0.9, 0.99]
+  eps: 1e-8
+  weight_decay: 1e-9
+  warmup_num_steps: 1000
+
+logger:
+  enable: True
+  project: "PROJECT_NAME"
+  name: "EXP_NAME"
+  dir: "path/to/logger_dir"
+  log_every_n_steps: 1
+
+checkpoint:
+  every_n_train_steps: 10000
+  dirpath: "path/to/ckpt_dir"
+  filename: "model-{step:02d}"
+  save_last: True
+  save_top_k: -1
+  save_weights_only: False
+
+data:
+  mapping_file: "path/to/mapping_file" 
+  image_size: 64
+  test_image_size: 256
+  batch_size: 1
+  val_batch_size: 1
+  num_workers: 4
+  interpolation: "bilinear"
+  downscale_factor: 4
+  min_crop_factor: 0.25
+  max_crop_factor: 0.25
+  random_crop: True
+  degradation: "cv_bicubic" # "cv_nearest", "cv_bilinear", "cv_area", "bsrgan_light", "bsrgan", etc
+  gaussian_blur: True
+  blur_prob: 0.5
+  random_flip_prob: 0.5

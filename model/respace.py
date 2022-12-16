@@ -14,7 +14,7 @@
 # limitations under the License.
 # ------------------------------------------------------------------------------------------------
 # Modified from:
-# 
+# https://github.com/openai/glide-text2im/blob/main/glide_text2im/respace.py
 # ------------------------------------------------------------------------------------------------
 
 import numpy as np

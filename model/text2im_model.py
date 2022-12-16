@@ -14,7 +14,7 @@
 # limitations under the License.
 # ------------------------------------------------------------------------------------------------
 # Modified from:
-# 
+# https://github.com/openai/glide-text2im/blob/main/glide_text2im/text2im_model.py
 # ------------------------------------------------------------------------------------------------
 
 import copy
@@ -30,29 +30,31 @@ dsp_checkpoint = checkpointing.checkpoint
 
 
 class Text2ImUNet(UNetModel):
-    clip_embed_dim: int = 768
     """
     A UNetModel that conditions on text with an encoding transformer.
 
     Expects an extra kwarg `tokens` of text.
 
     :param text_ctx: number of text tokens to expect.
-    :param tokenizer: the text tokenizer for sampling/vocab size.
+    :param xf_width: hidden channels of text encodings.
+    :param xf_final_ln: whether to apply a final layer norm to text encodings.
+    :param use_pretrained_text_encoder: whether to use a pretrained text encoder.
     """
 
     def __init__(
         self,
         text_ctx: int,
-        xf_width,
-        xf_final_ln,
-        tokenizer,
+        xf_width: int,
+        xf_final_ln: bool,
         *args,
-        use_pretrained_text_encoder=False,
+        clip_embed_dim:int=768,
+        use_clip_emb:bool=False,
+        use_pretrained_text_encoder:bool=False,
         **kwargs,
     ):
         self.text_ctx = text_ctx
         self.xf_width = xf_width
-        self.tokenizer = tokenizer
+        self.clip_embed_dim = clip_embed_dim 
         if "noise_cond_augment" in kwargs:
             del kwargs['noise_cond_augment']
 
@@ -62,10 +64,12 @@ class Text2ImUNet(UNetModel):
             super().__init__(*args, **kwargs, encoder_channels=xf_width)
 
         self.use_pretrained_text_encoder = use_pretrained_text_encoder
+        self.use_clip_emb = use_clip_emb
         self.clip_embed_proj = nn.Linear(self.clip_embed_dim, self.model_channels * 4)
         self.final_ln = LayerNorm(xf_width) if xf_final_ln else nn.Identity()
 
-        self.transformer_proj = nn.Linear(xf_width, self.model_channels * 4)
+        if xf_width > 0:
+            self.transformer_proj = nn.Linear(xf_width, self.model_channels * 4)
         self.time_to_half = nn.Linear(self.model_channels * 4, self.model_channels * 2)
         self.clip_to_half = nn.Linear(self.model_channels * 4, self.model_channels * 2)
 
@@ -74,7 +78,7 @@ class Text2ImUNet(UNetModel):
         if not self.use_pretrained_text_encoder and self.xf_width > 0:
             self.transformer_proj.to(th.float16)
 
-    def forward(self, x, timesteps, clip_emb=None, text_encodings=None, use_clip_emb=True, mode='train'):
+    def forward(self, x, timesteps, clip_emb=None, text_encodings=None, mode='train'):
         hs = []
         emb = self.time_embed(timestep_embedding(timesteps, self.model_channels).type(self.dtype))
         if self.xf_width > 0:
@@ -83,7 +87,7 @@ class Text2ImUNet(UNetModel):
             xf_proj = self.transformer_proj(text_embeds) # (B, 4 * C)
             xf_out = text_encodings.permute(0, 2, 1)
 
-            if not use_clip_emb:
+            if not self.use_clip_emb:
                 # mask 10% encodings
                 xf_out_mask = th.zeros(xf_out.shape[0], device=xf_out.device).type(
                     self.dtype).uniform_(0, 1) < 0.9 if mode=='train' else th.ones(xf_out.shape[0], device=xf_out.device).type(self.dtype)
@@ -106,6 +110,7 @@ class Text2ImUNet(UNetModel):
                 emb = th.cat([self.time_to_half(emb + xf_proj.to(emb) + clip_emb),
                             self.clip_to_half(clip_emb)], dim=1).to(clip_emb)
         else:
+            assert clip_emb is not None, "clip_emb has to be provided if xf_width is 0"
             clip_emb = clip_emb.to(emb)
             clip_emb = self.clip_embed_proj(clip_emb)
             clip_emb_mask = th.zeros(clip_emb.shape[0],  device=clip_emb.device).type(
@@ -117,12 +122,18 @@ class Text2ImUNet(UNetModel):
             
         h = x.type(self.dtype)
         for module in self.input_blocks:
-            h = dsp_checkpoint(module, h, emb, xf_out)
+            if mode == 'train':
+                h = dsp_checkpoint(module, h, emb, xf_out)
+            else:
+                h = module(h, emb, xf_out)
             hs.append(h)
         h = self.middle_block(h, emb, xf_out)
         for module in self.output_blocks:
             h = th.cat([h, hs.pop()], dim=1)
-            h = dsp_checkpoint(module, h, emb, xf_out)
+            if mode == 'train':
+                h = dsp_checkpoint(module, h, emb, xf_out)
+            else:
+                h = module(h, emb, xf_out)
         h = self.out(h)
         return h
 

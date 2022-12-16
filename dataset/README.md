@@ -19,6 +19,7 @@ The data directory tree follows the format:
         |  |-- raw_data
         |  |-- clip_embedding
         |  |-- t5_embedding
+  ...
 ```
 
 ### CC3M

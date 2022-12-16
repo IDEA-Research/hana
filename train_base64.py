@@ -19,7 +19,6 @@ import os
 import copy
 from omegaconf import OmegaConf
 from typing import Dict, Any
-from resize_right import resize
 
 import torch as th
 import pytorch_lightning as pl
@@ -29,155 +28,104 @@ from pytorch_lightning.utilities import rank_zero_only
 from pytorch_lightning.strategies import DeepSpeedStrategy
 
 from config.deepspeed import deepspeed_config
-from callbacks import EMAWeightUpdate, DemoCallback
-from data.datamodule import get_datamodule
-
+from callbacks import EMAWeightUpdate, VisualizeCallBack
+from data.datamodule import BaseDataModule
 from model.resample import LossAwareSampler, UniformSampler
-from model.model_creation import create_model_and_diffusion as create_model_and_diffusion_dalle2
-from model.model_creation import create_gaussian_diffusion
-from model.text2im_model import Text2ImUNet
-from model.respace import SpacedDiffusion
-from utils.tokenizer import get_encoder
-
-# experiment setting
-os.environ["WANDB_SILENT"] = "true"
-
-
-def resize_image_to(image, target_image_size):
-    orig_h, orig_w = image.shape[-2:]
-
-    if orig_h == target_image_size and orig_w == target_image_size:
-        return image
-
-    scale_factors = (target_image_size / orig_h, target_image_size / orig_w)
-
-    return resize(image, scale_factors=scale_factors)
-
+from model.model_creation import create_model, create_gaussian_diffusion
 
 class BaseDecoder(pl.LightningModule):
-    def __init__(self, config):
+    def __init__(self, cfg):
         super().__init__()
-        self.model_cfg = config.MODEL
-        self.diff_cfg = config.DIFFUSION
-        self.train_cfg = config.TRAIN
-
-        eval_timestep_respacing = self.diff_cfg['eval_timestep_respacing']
-        schedule_sampler = self.diff_cfg.schedule_sampler
-        del self.diff_cfg['eval_timestep_respacing']
-        del self.diff_cfg["schedule_sampler"]
-        model_and_diffusion_settings = OmegaConf.merge(
-            self.model_cfg, self.diff_cfg)
-        del model_and_diffusion_settings["use_clip_emb"]
-
-        self.model, self.diffusion = create_model_and_diffusion_dalle2(
-            **model_and_diffusion_settings,
+        self.cfg = cfg
+        self.model = create_model(**cfg.model)
+        self.diffusion = create_gaussian_diffusion(
+            steps=cfg.diffusion.steps,
+            learn_sigma=cfg.diffusion.learn_sigma,
+            sigma_small=cfg.diffusion.sigma_small,
+            noise_schedule=cfg.diffusion.noise_schedule,
+            use_kl=cfg.diffusion.use_kl,
+            predict_xstart=cfg.diffusion.predict_xstart,
+            rescale_timesteps=cfg.diffusion.rescale_timesteps,
+            rescale_learned_sigmas=cfg.diffusion.rescale_learned_sigmas,
+            timestep_respacing=cfg.diffusion.timestep_respacing,
         )
-        self.eval_diff_cfg = copy.deepcopy(self.diff_cfg)
-        self.eval_diff_cfg['timestep_respacing'] = eval_timestep_respacing
-        if eval_timestep_respacing.startswith("ddim"):
-            self.eval_sampler='ddim'
-        else:
-            self.eval_sampler='ddpm'
-        self.eval_diff_cfg['steps'] = self.eval_diff_cfg['diffusion_steps']
-        del self.eval_diff_cfg['diffusion_steps']
-        self.eval_diffusion = create_gaussian_diffusion(**self.eval_diff_cfg)
-        assert isinstance(self.model, Text2ImUNet)
-        assert isinstance(self.diffusion, SpacedDiffusion)
+        self.eval_diffusion = create_gaussian_diffusion(
+            steps=cfg.diffusion.steps,
+            learn_sigma=cfg.diffusion.learn_sigma,
+            sigma_small=cfg.diffusion.sigma_small,
+            noise_schedule=cfg.diffusion.noise_schedule,
+            use_kl=cfg.diffusion.use_kl,
+            predict_xstart=cfg.diffusion.predict_xstart,
+            rescale_timesteps=cfg.diffusion.rescale_timesteps,
+            rescale_learned_sigmas=cfg.diffusion.rescale_learned_sigmas,
+            timestep_respacing=cfg.diffusion.eval_timestep_respacing,
+        )
+        self.eval_sampler='ddim' if cfg.diffusion.eval_timestep_respacing.startswith("ddim") else 'ddpm'
+        self.schedule_sampler = self.build_schedule_sampler(cfg)
 
-        if schedule_sampler  == 'LossAwareSampler':
-            self.schedule_sampler = LossAwareSampler()
-        else:
-            self.schedule_sampler = UniformSampler(self.diffusion)
-
-        self.tokenizer = get_encoder(text_ctx=self.model_cfg.text_ctx)
-
-        if self.train_cfg.ema:
+        if cfg.train.ema.enable:
             self.ema_model = copy.deepcopy(self.model)
             self.ema_model.requires_grad_(False)
             self.ema_params = copy.deepcopy(self.ema_model.state_dict())  # fp32
             # Manually restore `ema_params` from saved `ema_model` since it won't be checkpointed.
             # Note that restored `ema_params` would be upcasted from fp16 to fp32. 
-            if self.train_cfg.trainer.ckpt_path is not None:
-                self.restore_ema_params(f"{self.train_cfg.trainer.ckpt_path}/checkpoint/mp_rank_00_model_states.pt")
+            if cfg.train.resume.ckpt_path is not None:
+                self.restore_ema_params(f"{cfg.train.resume.ckpt_path}/checkpoint/mp_rank_00_model_states.pt")
         else:
             self.ema_model = None
 
         self.save_hyperparameters()
-
-    def build_model(self, cfg):
-        """build model"""
-        pass
-
-    def build_diffusion(self, cfg):
-        """return train diffusion / eval diffusion according to cfg"""
-        pass
+    
+    def build_schedule_sampler(self, cfg):
+        schedule_sampler = cfg.diffusion.schedule_sampler
+        if schedule_sampler == 'LossAwareSampler':
+            return LossAwareSampler()
+        else:
+            return UniformSampler(self.diffusion)
 
     def configure_optimizers(self):
+        cfg = self.cfg.optimizer
         optimizer = th.optim.AdamW(
             params=self.model.parameters(),
-            lr=self.train_cfg.lr,
-            betas=self.train_cfg.betas,
-            eps=self.train_cfg.eps,
-            weight_decay=self.train_cfg.weight_decay,
+            lr=cfg.lr,
+            betas=cfg.betas,
+            eps=cfg.eps,
+            weight_decay=cfg.weight_decay,
         )
         return optimizer
 
     def training_step(self, batch):
         """
         Args:
-            batch: (dict): 
-                img_embedding: Tensor (B, D)
-                text_embedding: Tensor (B, D)
+            batch (dict): 
                 img: Tensor (B, C, H, W)
-                text: List[str]
-                token: Tensor (B, T)
-                mask: Tensor (B, T)
+                caption: List[str]
+                text_clip_embedding: Tensor (B, D), optional
+                img_clip_embedding: Tensor (B, D), optional
+                t5_embedding: Tensor (B, L, D), optional
         """
         cond = {}
-        # TODO: according to input dict
-        if len(batch) == 5:
-            img_embed, _, img, _, text_encodings = batch
-            cond["clip_emb"] = img_embed
-            cond["text_encodings"] = text_encodings
-            # When using pretrained T5, CLIP embedding is optional.
-            cond["use_clip_emb"] = self.model_cfg.use_clip_emb
-        elif len(batch) == 6:
-            img_embed, _, img, _, token, mask = batch
-            cond["clip_emb"] = img_embed
-            cond["tokens"] = token
-            cond["mask"] = mask        
-
+        img = batch["img"]
+        img = img.mul(2).sub(1)
+        cond['clip_emb'] = batch.get("img_clip_embedding", None)
+        cond['text_encodings'] = batch.get("t5_embedding", None)
         t, weights = self.schedule_sampler.sample(img.shape[0], img.device)
 
         losses = self.diffusion.training_losses(
             model=self.model,
-            x_start=img.mul(2).sub(1),
+            x_start=img,
             t=t,
             model_kwargs=cond,
         )
 
         if isinstance(self.schedule_sampler, LossAwareSampler):
-            self.schedule_sampler.update_with_local_losses(
-                local_ts=t, local_losses=losses["loss"].detach()
-            )
+            self.schedule_sampler.update_with_local_losses(local_ts=t, local_losses=losses["loss"].detach())
 
         loss = (losses["loss"] * weights).mean()
-        
-        # TODO: self.log -> for loop
-        
-        # log loss terms
-        # self.log("train/loss", loss, on_step=True, rank_zero_only=True)
-        if "mse" in losses:
-            self.log("train/mse", losses["mse"].mean(), on_step=True, rank_zero_only=True)
-        if "vb" in losses:
-            self.log("train/vb", losses["vb"].mean(), on_step=True, rank_zero_only=True)
-
+        for loss_term in losses:
+            self.log(f"train/{loss_term}", losses[loss_term].mean(), on_step=True, rank_zero_only=True)
         self.log("train/loss", loss, on_step=True, rank_zero_only=True)
         return loss
-
-    # TODO: delete validation steps
-    def validation_step(self, *args, **kwargs):
-        pass
 
     @rank_zero_only
     def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
@@ -194,116 +142,112 @@ class BaseDecoder(pl.LightningModule):
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument("--config_path", type=str,
-                            default="config/decoder64.yaml")
-    arg_parser.add_argument(
-        "--train_micro_batch_size_per_gpu", type=int, default=1)
+    arg_parser.add_argument("--config_path", type=str, default="config/decoder64.yaml")
+    arg_parser.add_argument("--mapping_file", type=str, required=True)
+    arg_parser.add_argument("--train_micro_batch_size_per_gpu", type=int, default=1)
     arg_parser.add_argument("--val_batch_size", type=int, default=0)
     arg_parser.add_argument("--gpus", type=int, default=1)
     arg_parser.add_argument("--num_nodes", type=int, default=1)
     arg_parser.add_argument("--fp16", action="store_true")
     arg_parser.add_argument("--offload", action="store_true")
+    arg_parser.add_argument("--wandb_debug", action="store_true")
     args = arg_parser.parse_args()
 
     # set up config
-    config = OmegaConf.load(args.config_path)
+    cfg = OmegaConf.load(args.config_path)
 
     # change deepspeed config according to args & config
-    # TODO: cfg.train.lr / cfg.train.min_lr / cfg.train.warmup_num_steps
     deepspeed_config["train_micro_batch_size_per_gpu"] = args.train_micro_batch_size_per_gpu
     if "scheduler" in deepspeed_config:
-        deepspeed_config["scheduler"]["params"]["warmup_max_lr"] = config.TRAIN.lr
-        deepspeed_config["scheduler"]["params"]["warmup_min_lr"] = config.TRAIN.min_lr
-        deepspeed_config["scheduler"]["params"]["warmup_num_steps"] = config.TRAIN.warmup_num_steps
-    
-    # TODO: cfg.model.use_fp16
+        deepspeed_config["scheduler"]["params"]["warmup_max_lr"] = cfg.optimizer.lr
+        deepspeed_config["scheduler"]["params"]["warmup_min_lr"] = cfg.optimizer.min_lr
+        deepspeed_config["scheduler"]["params"]["warmup_num_steps"] = cfg.optimizer.warmup_num_steps
     if args.fp16:
-        config.MODEL.use_fp16 = True
+        cfg.model.use_fp16 = True
     else:
-        config.MODEL.use_fp16 = False
+        cfg.model.use_fp16 = False
         del deepspeed_config["fp16"]
-
     if not args.offload:
         del deepspeed_config["zero_optimization"]["offload_optimizer"]
-
-    ds_strategy = DeepSpeedStrategy(config=deepspeed_config)
+    deepspeed_strategy = DeepSpeedStrategy(config=deepspeed_config)
 
     # set up data
-    data_cfg = config.DATA
-    data_cfg.batch_size = args.train_micro_batch_size_per_gpu
+    cfg.data.mapping_file = args.mapping_file
+    cfg.data.batch_size = args.train_micro_batch_size_per_gpu
     if args.val_batch_size > 0:
-        data_cfg.val_batch_size = args.val_batch_size
-    dm = get_datamodule(data_cfg)
-
-    # set up decoder module
-    decoder = BaseDecoder(config)
-
-    # set up checkpoint callback
-    ckpt_dir = config.TRAIN.checkpoint.dirpath
-    if not os.path.exists(ckpt_dir):
-        os.makedirs(ckpt_dir, exist_ok=True)
-    checkpoint_callback = ModelCheckpoint(
-        **config.TRAIN.checkpoint,
+        cfg.data.val_batch_size = args.val_batch_size
+    data = BaseDataModule(
+        mapping_file=cfg.data.mapping_file,
+        return_clip_embedding=cfg.model.use_clip_emb,
+        return_t5_embedding=cfg.model.use_pretrained_text_encoder,
+        image_size=cfg.data.image_size,
+        batch_size=cfg.data.batch_size,
+        val_batch_size=cfg.data.val_batch_size,
+        num_workers=cfg.data.num_workers,
+        p_flip=cfg.data.p_flip,
+        interpolation=cfg.data.interpolation,
     )
 
-    # TODO: Demo to WandbVisualizeCallBack
-    # set up demo callback
-    demo_callback = DemoCallback(
-        demo_every=config.TRAIN.demo.every,
-        dynamic_thresholding_percentile=config.TRAIN.demo.dynamic_thresholding_percentile,
-        guidance_scale=config.TRAIN.demo.guidance_scale,
-        use_clip_emb=config.MODEL.use_clip_emb,
-        eval_online=config.TRAIN.demo.online,
+    # set up decoder module
+    decoder = BaseDecoder(cfg)
+    
+    # build callbacks
+    callbacks = []
+
+    # set up checkpoint callback
+    if not os.path.exists(cfg.checkpoint.dirpath):
+        os.makedirs(cfg.checkpoint.dirpath, exist_ok=True)
+    checkpoint_callback = ModelCheckpoint(**cfg.checkpoint)
+
+    # set up visualize(validation) callback
+    demo_callback = VisualizeCallBack(
+        demo_every=cfg.validate.every,
+        dynamic_thresholding_percentile=cfg.validate.dynamic_thresholding_percentile,
+        guidance_scale=cfg.validate.guidance_scale,
+        eval_online=cfg.validate.online,
     )
     
     # set up ema callback
-    callbacks = []
-    if config.TRAIN.ema:
+    if cfg.train.ema.enable:
         ema_callback = EMAWeightUpdate(
-            tau=config.TRAIN.ema_decay,
-            update_ema_after_steps=config.TRAIN.update_ema_after_steps,
-            update_every_steps=config.TRAIN.update_every_steps,
-            cpu=config.TRAIN.cpu
+            tau=cfg.train.ema.decay,
+            update_ema_after_steps=cfg.train.ema.update_after_steps,
+            update_every_steps=cfg.train.ema.update_every_steps,
+            cpu=cfg.train.ema.cpu
         )
         callbacks.append(ema_callback)
     callbacks.extend([demo_callback, checkpoint_callback, ModelSummary(max_depth=1)])
 
     # set up wandb logger
-    # TODO: move to config
-    logger_dir = "./log/base64"
-    if not os.path.exists(logger_dir):
-        os.makedirs(logger_dir, exist_ok=True)
-    # TODO: if config.wandb.enabled, add a switch
-    wandb_logger = WandbLogger(
-        **{**config.TRAIN.wandb, 'save_dir': logger_dir, },
-    )
+    logger = None
+    if cfg.logger.enable:
+        logger_dir = cfg.logger.dir
+        if not os.path.exists(logger_dir):
+            os.makedirs(logger_dir, exist_ok=True)
+        os.environ["WANDB_SILENT"] = "true"
+        logger = WandbLogger(
+            **{
+                'project': cfg.logger.project,
+                'name': cfg.logger.name,
+                'save_dir': logger_dir, 
+                'mode': 'disabled' if args.wandb_debug else 'online',
+            },
+        )
     
     # init trainer
-    pl.seed_everything(config.TRAIN.seed)
-    # cfg.train.max_epochs
-    # cfg.train.max_steps
-    # cfg.train.log_every_n_steps
-    # cfg.acccumulate_grad_batches
-    # TODO delete trainer_cfg
-    trainer_cfg = config.TRAIN.trainer
+    pl.seed_everything(cfg.train.seed)
     trainer = pl.Trainer(
         precision=16 if args.fp16 else 32,
-        max_epochs=trainer_cfg.max_epochs,
-        max_steps=trainer_cfg.max_steps,
-        logger=wandb_logger,
+        max_epochs=cfg.train.max_epochs,
+        max_steps=cfg.train.max_steps,
+        logger=logger,
         gpus=args.gpus,
         num_nodes=args.num_nodes,
-        gradient_clip_val=trainer_cfg.gradient_clip_val,
-        accumulate_grad_batches=trainer_cfg.accumulate_grad_batches,
-        log_every_n_steps=trainer_cfg.log_every_n_steps,
+        gradient_clip_val=cfg.train.gradient_clip_val,
+        accumulate_grad_batches=cfg.train.accumulate_grad_batches,
+        log_every_n_steps=cfg.logger.log_every_n_steps,
         callbacks=callbacks,
-        strategy=ds_strategy,
-        # TODO(jiananw): validate later with multiple nodes.
-        # according to official doc
-        # (https://pytorch-lightning.readthedocs.io/en/latest/common/trainer.html?highlight=Sampler#replace-sampler-ddp)
-        # `replace_sampler_ddp` should be set to `False` when using customized sampler. 
-        #  But setting it to `True` also calls customized sampler.
-        replace_sampler_ddp=False,
+        strategy=deepspeed_strategy,
     )
     trainer.logger.experiment.save(args.config_path)
-    trainer.fit(decoder, datamodule=dm, ckpt_path=config.TRAIN.trainer.ckpt_path)
+    trainer.fit(decoder, datamodule=data, ckpt_path=cfg.train.resume.ckpt_path)
