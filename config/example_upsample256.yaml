@@ -92,7 +92,7 @@ data:
   min_crop_factor: 0.25
   max_crop_factor: 0.25
   random_crop: True
-  degradation: "cv_bicubic"
+  degradation: "cv_bicubic" # "cv_nearest", "cv_bilinear", "cv_area", "bsrgan_light", "bsrgan", etc
   gaussian_blur: True
   blur_prob: 0.5
   random_flip_prob: 0.5
