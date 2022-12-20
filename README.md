@@ -7,6 +7,7 @@
   <img src="./assets/text_to_image.png" width="100%"/>
 </div>
 
+The major features of **hana** can be summarized as follows:
 
 ## News
 * **`16 Dec, 2022`:** **Hana** code and pretrained weights are released!
@@ -36,7 +37,7 @@ Prepare your **text & img** dataset before training. Because our model will cond
 See [DATA](dataset/README.md) for reference.
 
 ## Config System
-Please refer to [Config Instructions]() for the details about the basic usage and settings of experiment configs.
+Please refer to [CONFIG](CONFIG.md) for the details about the basic usage and settings of experiment configs.
 
 ## Training
 **Train text2img 64\*64 resolution model** 
