@@ -1,20 +1,20 @@
 # Hana <img src="assets/hana.png" width="30">
 
-**Hana** is an open-source library that can create realistic images and art from a description in natural language based on **diffusion models**. It mainly follows [Imagen](https://imagen.research.google/) and [DALLE-2](https://openai.com/dall-e-2/) and is built upon [pytorch-lightning](https://www.pytorchlightning.ai/) framework.
+**Hana** is an open-source library that can create realistic images and art from a textual description based on **diffusion models**. It mainly follows [Imagen](https://imagen.research.google/) and [DALLE-2](https://openai.com/dall-e-2/) and is built upon [pytorch-lightning](https://www.pytorchlightning.ai/) framework.
 
 <div align="center">
   <img src="./assets/text_to_image.png" width="100%"/>
 </div>
 
-The major features of **hana** can be summarized as follows:
-* 🍀 A simple implementation of text-to-image model based on [Imagen](https://imagen.research.google/) and [DALLE-2](https://openai.com/dall-e-2/). Detail train scripts are provided.
-* 🌸 Pretrained text-to-image models with 64x64 resolution.
-* 🌺 Pretrained upsampler to generate 256x256 resolution images.
-* 🌼 Support various downstream applications, such as prompt-to-prompt, dreambooth, dreamfusion.
+The main features of **hana** can be summarized as follows:
+* 🍀 A simple implementation of text-to-image model based on [Imagen](https://imagen.research.google/) and [DALLE-2](https://openai.com/dall-e-2/). Detailed training scripts are provided.
+* 🌸 Pretrained text-to-image model to generate images of resolution 64x64 given textual description.
+* 🌺 Pretrained upsampler to upscale 64x64 images to 256x256 resolution.
+* 🌼 Support various downstream applications, such as prompt-to-prompt, dreambooth and dreamfusion.
 
 
 ## News
-* **`16 Dec, 2022`:** **Hana** code and pretrained weights are released!
+* **`21 Dec, 2022`:** **Hana** code and pretrained weights are released!
 
 
 ## Installation
@@ -37,38 +37,38 @@ pip install -r requirements.txt
 ```
 
 ## Inference
-We simply provide text2img 256*256 inference jupyter notebook. Have fun with [inference](inference.ipynb).  
+We provide text-to-image 256x256 inference jupyter notebook. Have fun with [inference](inference.ipynb).  
 Before running inference, please download our pretrained model weights and corresponding config files following [MODEL](MODEL.md) guidance.
 
-## Downstream application
+## Downstream applications
 * **Prompt-to-prompt**  
   Image editing with cross-attention control. 
-  * Our Implement:
-  In order to get started, we recommend taking a look at our notebook: [prompt-to-prompt](prompt2prompt/prompt2prompt.ipynb). The notebook contains a simple end-to-end example of usage of prompt-to-prompt on top of our pretrained 64*64 text2img model.
+  * Our Implementation:
+  We recommend taking a look at our notebook: [prompt-to-prompt](prompt2prompt/prompt2prompt.ipynb) to get started. The notebook contains a simple end-to-end example of using prompt-to-prompt on top of our pretrained 64x64 text-to-image model.
   <div align="center">
     <img src="./assets/prompt2prompt.png" width="85%"/>
   </div> 
 
-  * For reference: Google implementation [[paper]](https://prompt-to-prompt.github.io/ptp_files/Prompt-to-Prompt_preprint.pdf) [[code]](https://github.com/google/prompt-to-prompt) 
+  * For reference: [[paper]](https://prompt-to-prompt.github.io/ptp_files/Prompt-to-Prompt_preprint.pdf) Implemented with stable difusion[[code]](https://github.com/google/prompt-to-prompt) 
 * **Dreambooth**  
-  New approach for "personalization" of text-to-image diffusion models (specializing them to users' needs).  
+  "Personalize" text-to-image generative models on user-provided images (concepts).  
   *Code coming soon!*
   * For reference: [[paper]](https://arxiv.org/abs/2208.12242) Implemented with stable diffusion [[code]](https://github.com/XavierXiao/Dreambooth-Stable-Diffusion) 
 * **Dreamfusion**  
-  Text-to-3D using 2D Diffusion.  
+  Text-to-3D using pretrained 2D diffusion model.  
   *Code coming soon!*
   * For reference: [[paper]](https://arxiv.org/abs/2209.14988)  Implemented with stable diffusion  [[code]](https://github.com/ashawkey/stable-dreamfusion) 
 
 
 ## Dataset
-Prepare your **text & img** dataset before training. Because our model will condition on the pretrained language model, we need to process and store the relevant required features in an offline manner in order to facilitate the train process.  
+Prepare your **text & img** dataset before training. Our model conditions on pretrained models such as T5-XXL and CLIP, for faster training we pre-process texts or images into corresponding features in an offline manner.  
 See [DATA](dataset/README.md) for reference.
 
 ## Config System
-Please refer to [CONFIG](config/CONFIG.md) for the details about the basic usage and settings of experiment configs.
+Please refer to [CONFIG](config/CONFIG.md) for details about experiment configs.
 
 ## Training
-**Train text2img 64\*64 resolution model**  
+**Train text-to-image 64x64 resolution model**  
 Example shown in [train_base64.sh](scripts/train_base64.sh)
 ```bash
 NODES=1
@@ -103,10 +103,10 @@ train:
         ckpt_path: path/to/resume_checkpoint
 ...
 ```
-Then, normally run train script.
+Then, run training script as detailed above in Training.
 
 ## Models
-Here we provide our pretrained model weights and config files, please see [MODEL](MODEL.md).
+We provide our pretrained model weights and config files, please see [MODEL](MODEL.md) for details.
 
 ## Acknowledgements
 - [GLIDE](https://github.com/openai/glide-text2im)
