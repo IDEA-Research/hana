@@ -132,7 +132,9 @@ dmypy.json
 .vscode/
 
 # jupyter notebook
-**/*.ipynb
+*.ipynb
+!prompt2prompt/prompt2prompt.ipynb
+!inference.ipynb
 
 # logs
 log/
