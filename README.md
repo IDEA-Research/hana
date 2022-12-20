@@ -36,11 +36,11 @@ pip install -r requirements.txt
 ```
 
 ## Inference
-We simply provide text2img 256*256 inference jupyter notebook. Have fun with [inference](inference.ipynb).
+We simply provide text2img 256*256 inference jupyter notebook. Have fun with [inference](inference.ipynb).  
 Before running inference, please download our pretrained model weights and corresponding config files following [MODEL](MODEL.md) guidance.
 
 ## Downstream application
-* **Prompt-to-prompt**
+* **Prompt-to-prompt**  
   Image editing with cross-attention control. 
   * Our Implement:
   In order to get started, we recommend taking a look at our notebook: [prompt-to-prompt](prompt2prompt/prompt2prompt.ipynb). The notebook contains a simple end-to-end example of usage of prompt-to-prompt on top of our pretrained 64*64 text2img model.
@@ -49,25 +49,25 @@ Before running inference, please download our pretrained model weights and corre
   </div> 
 
   * For reference: Google implementation [[paper]](https://prompt-to-prompt.github.io/ptp_files/Prompt-to-Prompt_preprint.pdf) [[code]](https://github.com/google/prompt-to-prompt) 
-* **Dreambooth**
-  New approach for "personalization" of text-to-image diffusion models (specializing them to users' needs).
+* **Dreambooth**  
+  New approach for "personalization" of text-to-image diffusion models (specializing them to users' needs).  
   *Code coming soon!*
   * For reference: [[paper]](https://arxiv.org/abs/2208.12242) Implemented with stable diffusion [[code]](https://github.com/XavierXiao/Dreambooth-Stable-Diffusion) 
-* **Dreamfusion**
-  Text-to-3D using 2D Diffusion.
+* **Dreamfusion**  
+  Text-to-3D using 2D Diffusion.  
   *Code coming soon!*
   * For reference: [[paper]](https://arxiv.org/abs/2209.14988)  Implemented with stable diffusion  [[code]](https://github.com/ashawkey/stable-dreamfusion) 
 
 
 ## Dataset
-Prepare your **text & img** dataset before training. Because our model will condition on the pretrained language model, we need to process and store the relevant required features in an offline manner in order to facilitate the train process. 
+Prepare your **text & img** dataset before training. Because our model will condition on the pretrained language model, we need to process and store the relevant required features in an offline manner in order to facilitate the train process.  
 See [DATA](dataset/README.md) for reference.
 
 ## Config System
 Please refer to [CONFIG](config/CONFIG.md) for the details about the basic usage and settings of experiment configs.
 
 ## Training
-**Train text2img 64\*64 resolution model** 
+**Train text2img 64\*64 resolution model**  
 Example shown in [train_base64.sh](scripts/train_base64.sh)
 ```bash
 NODES=1
@@ -93,7 +93,7 @@ Args:
 - `--wandb_debug`: whether logging to wandb server
 
 
-**Resume Training**
+**Resume Training**  
 Specify resume checkpoint path in experiment config file, like:
 ```yaml
 ...
