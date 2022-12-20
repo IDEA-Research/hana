@@ -1,5 +1,5 @@
 # Hana
-**Hana** is an open-source library that can create realistic images and art from a description in natural language based on **diffusion models**. It mainly follows [Imagen](https://imagen.research.google/) and [DALLE-2](https://openai.com/dall-e-2/) and built upon [pytorch-lightning](https://www.pytorchlightning.ai/) framework.
+**Hana** is an open-source library that can create realistic images and art from a description in natural language based on **diffusion models**. It mainly follows [Imagen](https://imagen.research.google/) and [DALLE-2](https://openai.com/dall-e-2/) and is built upon [pytorch-lightning](https://www.pytorchlightning.ai/) framework.
 
 <div align="center">
   <img src="./assets/text_to_image.png" width="100%"/>
@@ -35,11 +35,11 @@ Prepare your **text & img** dataset before training. Because our model will cond
 See [DATA](dataset/README.md) for reference.
 
 ## Config System
-Please refer to [CONFIG](CONFIG.md) for the details about the basic usage and settings of experiment configs.
+Please refer to [CONFIG](config/CONFIG.md) for the details about the basic usage and settings of experiment configs.
 
 ## Training
 **Train text2img 64\*64 resolution model** 
-Example shown in [train_base64.sh](./train_base64.sh)
+Example shown in [train_base64.sh](scripts/train_base64.sh)
 ```bash
 NODES=1
 GPUS_PER_NODE=2
