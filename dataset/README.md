@@ -2,7 +2,7 @@
 ## Dataset Setup
 The following datasets should be prepared before training.
 
-**Note that if you only want want to run experiments on one specific dataset, you can focus on the setup for that and skip the rest.**
+**Note that if you only want to run experiments on one specific dataset, you can focus on the setup for that dataset and skip the rest.**
 
 The data directory tree follows the format:
 ```
@@ -25,11 +25,11 @@ The data directory tree follows the format:
 ### CC3M
 We use [img2dataset](https://github.com/rom1504/img2dataset) package to help download the CC3M dataset, 
 see the [installation guidance](https://github.com/rom1504/img2dataset#:~:text=url%2Bcaption%20datasets.-,Install,-pip%20install%20img2dataset)
-of the package. Here we list main procedures:
+of the package. Here we list the main procedures:
 * Download the metadata
   
   Go to https://ai.google.com/research/ConceptualCaptions/download and press download, which is a 500MB tsv file.\
-  Add the column names at the top of the file with `sed -i '1s/^/caption\turl\n/' Train_GCC-training.tsv`
+  Add column names at the top of the file with `sed -i '1s/^/caption\turl\n/' Train_GCC-training.tsv`
 * Download the images with [img2dataset](https://github.com/rom1504/img2dataset)
   Run this following command. It will download the cc3m dataset under the `output_folder` without resizing image.
   ```bash
