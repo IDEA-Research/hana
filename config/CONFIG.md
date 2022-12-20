@@ -1,7 +1,7 @@
 # Experiment config example
-In summary, the pre-defined config settings containing `model`, `diffusion`, `train`, `validate`, `optimizer`, `logger`, `checkpoint` and `data`. 
+In summary, the pre-defined config settings contain `model`, `diffusion`, `train`, `validate`, `optimizer`, `logger`, `checkpoint` and `data`. 
 
-Here we list an explicit explanation for text2img `64*64` experiment config as follows:
+Here we list an explicit explanation for text-to-image `64x64` experiment config as follows:
 
 ## model
 ```yaml
