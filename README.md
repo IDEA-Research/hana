@@ -1,4 +1,5 @@
-# Hana
+# Hana <img src="assets/hana.png" width="30">
+
 **Hana** is an open-source library that can create realistic images and art from a description in natural language based on **diffusion models**. It mainly follows [Imagen](https://imagen.research.google/) and [DALLE-2](https://openai.com/dall-e-2/) and is built upon [pytorch-lightning](https://www.pytorchlightning.ai/) framework.
 
 <div align="center">
