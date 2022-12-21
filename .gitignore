@@ -138,3 +138,6 @@ dmypy.json
 
 # logs
 log/
+
+# ckpt
+ckpt/
