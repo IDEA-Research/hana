@@ -14,7 +14,7 @@ The main features of **hana** can be summarized as follows:
 
 
 ## News
-* **`21 Dec, 2022`:** **Hana** code and pretrained weights are released!
+* **`23 Dec, 2022`:** **Hana** code and pretrained weights are released!
 
 
 ## Installation
